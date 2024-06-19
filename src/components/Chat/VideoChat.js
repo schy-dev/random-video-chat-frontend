@@ -8,6 +8,16 @@ const VideoChat = () => {
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
 
+  const handleICECandidateEvent = useCallback((e) => {
+    if (e.candidate) {
+      socket.emit('ice-candidate', e.candidate);
+    }
+  }, [socket]);
+
+  const handleTrackEvent = useCallback((e) => {
+    remoteVideoRef.current.srcObject = e.streams[0];
+  }, []);
+
   const createPeer = useCallback(() => {
     const peer = new RTCPeerConnection({
       iceServers: [
@@ -21,7 +31,7 @@ const VideoChat = () => {
     peer.ontrack = handleTrackEvent;
 
     return peer;
-  }, []);
+  }, [handleICECandidateEvent, handleTrackEvent]);
 
   const handleReceiveOffer = useCallback(async (offer) => {
     peerRef.current = createPeer();
@@ -60,16 +70,6 @@ const VideoChat = () => {
   const callUser = async () => {
     peerRef.current = createPeer();
     localStreamRef.current.getTracks().forEach(track => peerRef.current.addTrack(track, localStreamRef.current));
-  };
-
-  const handleICECandidateEvent = (e) => {
-    if (e.candidate) {
-      socket.emit('ice-candidate', e.candidate);
-    }
-  };
-
-  const handleTrackEvent = (e) => {
-    remoteVideoRef.current.srcObject = e.streams[0];
   };
 
   return (
