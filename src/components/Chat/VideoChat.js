@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import io from 'socket.io-client';
 
 const VideoChat = () => {
@@ -7,6 +7,24 @@ const VideoChat = () => {
   const remoteVideoRef = useRef(null);
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
+
+  const handleReceiveOffer = useCallback(async (offer) => {
+    peerRef.current = createPeer();
+    await peerRef.current.setRemoteDescription(new RTCSessionDescription(offer));
+    localStreamRef.current.getTracks().forEach(track => peerRef.current.addTrack(track, localStreamRef.current));
+    const answer = await peerRef.current.createAnswer();
+    await peerRef.current.setLocalDescription(answer);
+    socket.emit('answer', answer);
+  }, [socket]);
+
+  const handleAnswer = useCallback((answer) => {
+    peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+  }, []);
+
+  const handleNewICECandidateMsg = useCallback((incoming) => {
+    const candidate = new RTCIceCandidate(incoming);
+    peerRef.current.addIceCandidate(candidate);
+  }, []);
 
   useEffect(() => {
     const startMedia = async () => {
@@ -22,7 +40,7 @@ const VideoChat = () => {
     socket.on('ice-candidate', handleNewICECandidateMsg);
 
     return () => socket.disconnect();
-  }, [socket]);
+  }, [socket, handleReceiveOffer, handleAnswer, handleNewICECandidateMsg]);
 
   const callUser = async () => {
     peerRef.current = createPeer();
@@ -44,28 +62,10 @@ const VideoChat = () => {
     return peer;
   };
 
-  const handleReceiveOffer = async (offer) => {
-    peerRef.current = createPeer();
-    await peerRef.current.setRemoteDescription(new RTCSessionDescription(offer));
-    localStreamRef.current.getTracks().forEach(track => peerRef.current.addTrack(track, localStreamRef.current));
-    const answer = await peerRef.current.createAnswer();
-    await peerRef.current.setLocalDescription(answer);
-    socket.emit('answer', answer);
-  };
-
-  const handleAnswer = (answer) => {
-    peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
-  };
-
   const handleICECandidateEvent = (e) => {
     if (e.candidate) {
       socket.emit('ice-candidate', e.candidate);
     }
-  };
-
-  const handleNewICECandidateMsg = (incoming) => {
-    const candidate = new RTCIceCandidate(incoming);
-    peerRef.current.addIceCandidate(candidate);
   };
 
   const handleTrackEvent = (e) => {
