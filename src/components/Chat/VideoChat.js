@@ -8,6 +8,21 @@ const VideoChat = () => {
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
 
+  const createPeer = useCallback(() => {
+    const peer = new RTCPeerConnection({
+      iceServers: [
+        {
+          urls: 'stun:stun.stunprotocol.org',
+        },
+      ],
+    });
+
+    peer.onicecandidate = handleICECandidateEvent;
+    peer.ontrack = handleTrackEvent;
+
+    return peer;
+  }, []);
+
   const handleReceiveOffer = useCallback(async (offer) => {
     peerRef.current = createPeer();
     await peerRef.current.setRemoteDescription(new RTCSessionDescription(offer));
@@ -15,7 +30,7 @@ const VideoChat = () => {
     const answer = await peerRef.current.createAnswer();
     await peerRef.current.setLocalDescription(answer);
     socket.emit('answer', answer);
-  }, [socket]);
+  }, [createPeer, socket]);
 
   const handleAnswer = useCallback((answer) => {
     peerRef.current.setRemoteDescription(new RTCSessionDescription(answer));
@@ -45,21 +60,6 @@ const VideoChat = () => {
   const callUser = async () => {
     peerRef.current = createPeer();
     localStreamRef.current.getTracks().forEach(track => peerRef.current.addTrack(track, localStreamRef.current));
-  };
-
-  const createPeer = () => {
-    const peer = new RTCPeerConnection({
-      iceServers: [
-        {
-          urls: 'stun:stun.stunprotocol.org',
-        },
-      ],
-    });
-
-    peer.onicecandidate = handleICECandidateEvent;
-    peer.ontrack = handleTrackEvent;
-
-    return peer;
   };
 
   const handleICECandidateEvent = (e) => {
